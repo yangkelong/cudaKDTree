@@ -79,6 +79,7 @@ endif()
 #
 # c) otherwise let cmake detect
 # ------------------------------------------------------------------
+set(CUKD_CUDA_ARCHITECTURES 70)
 if (DEFINED CMAKE_CUDA_ARCHITECTURES)
   # somebnody else already defined it; leave it as is.
 elseif (NOT (CUKD_CUDA_ARCHITECTURES STREQUAL "auto"))

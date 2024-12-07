@@ -46,7 +46,11 @@ namespace cukd {
   template<> struct scalar_type_of<int2>   { using type = int; };
   template<> struct scalar_type_of<int3>   { using type = int; };
   template<> struct scalar_type_of<int4>   { using type = int; };
-  
+  // 扩展 scalar_type_of 以支持 double 类型向量
+  template<> struct scalar_type_of<double2> { using type = double; };
+  template<> struct scalar_type_of<double3> { using type = double; };
+  template<> struct scalar_type_of<double4> { using type = double; };
+
   /*! template interface for cuda vector types (such as float3, int4,
       etc), that allows for querying which scalar type this vec is
       defined over */
@@ -57,6 +61,11 @@ namespace cukd {
   template<> struct num_dims_of<int2>   { enum { value = 2 }; };
   template<> struct num_dims_of<int3>   { enum { value = 3 }; };
   template<> struct num_dims_of<int4>   { enum { value = 4 }; };
+// 扩展 num_dims_of 以支持 double 类型向量
+template<> struct num_dims_of<double2> { enum { value = 2 }; };
+template<> struct num_dims_of<double3> { enum { value = 3 }; };
+template<> struct num_dims_of<double4> { enum { value = 4 }; };
+
 
   inline __both__ float get_coord(const float2 &v, int d) { return d?v.y:v.x; }
   inline __both__ float get_coord(const float3 &v, int d) { return (d==2)?v.z:(d?v.y:v.x); }
@@ -89,6 +98,19 @@ namespace cukd {
   inline __both__ int64_t divRoundUp(int64_t a, int64_t b) { return (a+b-1)/b; }
   inline __both__ uint64_t divRoundUp(uint64_t a, uint64_t b) { return (a+b-1)/b; }
 
+// 扩展 get_coord 和 set_coord 以支持 double 类型向量
+inline __both__ double get_coord(const double2 &v, int d) { return d ? v.y : v.x; }
+inline __both__ double get_coord(const double3 &v, int d) { return (d == 2) ? v.z : (d ? v.y : v.x); }
+inline __both__ double get_coord(const double4 &v, int d) { return (d >= 2) ? (d > 2 ? v.w : v.z) : (d ? v.y : v.x); }
+
+inline __both__ double &get_coord(double2 &v, int d) { return d ? v.y : v.x; }
+inline __both__ double &get_coord(double3 &v, int d) { return (d == 2) ? v.z : (d ? v.y : v.x); }
+inline __both__ double &get_coord(double4 &v, int d) { return (d >= 2) ? (d > 2 ? v.w : v.z) : (d ? v.y : v.x); }
+
+inline __both__ void set_coord(double2 &v, int d, double vv) { (d ? v.y : v.x) = vv; }
+inline __both__ void set_coord(double3 &v, int d, double vv) { ((d == 2) ? v.z : (d ? v.y : v.x)) = vv; }
+inline __both__ void set_coord(double4 &v, int d, double vv) { ((d >= 2) ? (d > 2 ? v.w : v.z) : (d ? v.y : v.x)) = vv; }
+
   using ::sin; // this is the double version
   using ::cos; // this is the double version
 
@@ -104,6 +126,15 @@ namespace cukd {
   inline __both__ float4 operator-(float4 a, float4 b)
   { return make_float4(a.x-b.x,a.y-b.y,a.z-b.z,a.w-b.w); }
 
+// 扩展运算符和函数以支持 double 类型向量
+inline __both__ double2 operator-(double2 a, double2 b) { 
+  return make_double2(a.x - b.x, a.y - b.y); }
+inline __both__ double3 operator-(double3 a, double3 b) { 
+  return make_double3(a.x - b.x, a.y - b.y, a.z - b.z); }
+inline __both__ double4 operator-(double4 a, double4 b) { 
+  return make_double4(a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w); }
+
+
   inline __both__ float dot(float2 a, float2 b)
   { return a.x*b.x+a.y*b.y; }
   inline __both__ float dot(float3 a, float3 b)
@@ -111,6 +142,14 @@ namespace cukd {
   inline __both__ float dot(float4 a, float4 b)
   { return a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w; }
   
+// 扩展运算符和函数以支持 double 类型向量
+inline __both__ double dot(double2 a, double2 b)
+{ return a.x*b.x+a.y*b.y; }
+inline __both__ double dot(double3 a, double3 b)
+{ return a.x*b.x+a.y*b.y+a.z*b.z; }
+inline __both__ double dot(double4 a, double4 b)
+{ return a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w; }
+   
   inline __both__ float2 min(float2 a, float2 b)
   { return make_float2(min(a.x,b.x),min(a.y,b.y)); }
   inline __both__ float3 min(float3 a, float3 b)
@@ -125,10 +164,27 @@ namespace cukd {
   inline __both__ float4 max(float4 a, float4 b)
   { return make_float4(max(a.x,b.x),max(a.y,b.y),max(a.z,b.z),max(a.w,b.w)); }
 
+
   inline std::ostream &operator<<(std::ostream &o, float3 v)
   { o << "(" << v.x << "," << v.y << "," << v.z << ")"; return o; }
 
-      
+// 扩展运算符和函数以支持 double 类型向量
+inline __both__ double2 min(double2 a, double2 b)
+{ return make_double2(min(a.x,b.x),min(a.y,b.y)); }
+inline __both__ double3 min(double3 a, double3 b)
+{ return make_double3(min(a.x,b.x),min(a.y,b.y),min(a.z,b.z)); }
+inline __both__ double4 min(double4 a, double4 b)
+{ return make_double4(min(a.x,b.x),min(a.y,b.y),min(a.z,b.z),min(a.w,b.w)); }
+
+inline __both__ double2 max(double2 a, double2 b)
+{ return make_double2(max(a.x,b.x),max(a.y,b.y)); }
+inline __both__ double3 max(double3 a, double3 b)
+{ return make_double3(max(a.x,b.x),max(a.y,b.y),max(a.z,b.z)); }
+inline __both__ double4 max(double4 a, double4 b)
+{ return make_double4(max(a.x,b.x),max(a.y,b.y),max(a.z,b.z),max(a.w,b.w)); }
+inline std::ostream &operator<<(std::ostream &o, double3 v)
+{ o << "(" << v.x << "," << v.y << "," << v.z << ")"; return o; }
+
   // ==================================================================
   // for some tests: our own, arbitrary-dimensioal vector type
   // ==================================================================
@@ -146,7 +202,23 @@ namespace cukd {
   template<int N>
   inline __both__ void set_coord(vec_float<N> &v, int d, float vv) { v.v[d] = vv; }
   
-  
+
+// 扩展运算符和函数以支持 double 类型向量
+template<int N>
+struct vec_double {
+  double v[N];
+};
+template<int N> struct scalar_type_of<vec_double<N>> { using type = double; };
+template<int N> struct num_dims_of<vec_double<N>> { enum { value = N }; };
+
+template<int N>
+inline __both__ double get_coord(const vec_double<N> &v, int d) { return v.v[d]; }
+template<int N>
+inline __both__ double &get_coord(vec_double<N> &v, int d) { return v.v[d]; }
+template<int N>
+inline __both__ void set_coord(vec_double<N> &v, int d, double vv) { v.v[d] = vv; }
+
+
 
   template<int N>
   inline __both__ vec_float<N> min(vec_float<N> a, vec_float<N> b)
@@ -181,6 +253,38 @@ namespace cukd {
   }
 
 
+// 扩展运算符和函数以支持 double 类型向量
+template<int N>
+inline __both__ vec_double<N> min(vec_double<N> a, vec_double<N> b)
+{
+  vec_double<N> r;
+  for (int i = 0; i < N; i++) r.v[i] = std::min(a.v[i], b.v[i]);
+  return r;
+}
+
+template<int N>
+inline __both__ vec_double<N> max(vec_double<N> a, vec_double<N> b)
+{
+  vec_double<N> r;
+  for (int i = 0; i < N; i++) r.v[i] = std::max(a.v[i], b.v[i]);
+  return r;
+}
+
+template<int N>
+inline __both__ double dot(vec_double<N> a, vec_double<N> b)
+{
+  double sum = 0.0;
+  for (int i = 0; i < N; i++) sum += a.v[i] * b.v[i];
+  return sum;
+}
+
+template<int N>
+inline __both__ vec_double<N> operator-(const vec_double<N> &a, const vec_double<N> &b)
+{
+  vec_double<N> r;
+  for (int i = 0; i < N; i++) r.v[i] = a.v[i] - b.v[i];
+  return r;
+}
 
   // ------------------------------------------------------------------
   /*! @{ helper function(s) to convert scalar of any type to float,
@@ -212,12 +316,16 @@ namespace cukd {
   auto sqrDistance(const point_t &a, const point_t &b)
   { const point_t d = a-b; return dot(d,d); }
 
+
+// 扩展运算符和函数以支持 double 类型向量// 扩展运算符和函数以支持 double 类型向量// 扩展运算符和函数以支持 double 类型向量// 扩展运算符和函数以支持 double 类型向量// 扩展运算符和函数以支持 double 类型向量// 扩展运算符和函数以支持 double 类型向量
+
   // ------------------------------------------------------------------
   // scalar distance(point,point)
   // ------------------------------------------------------------------
 
   inline __both__ float square_root(float f) { return sqrtf(f); }
-  
+  inline __both__ double square_root(double f) { return sqrt(f); }
+
   template<typename point_t>
   inline __both__ auto distance(const point_t &a, const point_t &b)
   { return square_root(sqrDistance(a,b)); }
@@ -241,8 +349,12 @@ namespace cukd {
   }
   
   // ------------------------------------------------------------------
-  inline std::ostream &operator<<(std::ostream &out,
-                                  float2 v)
+  inline std::ostream &operator<<(std::ostream &out, float2 v)
+  {
+    out << "(" << v.x << "," << v.y << ")";
+    return out;
+  }
+  inline std::ostream &operator<<(std::ostream &out, double2 v)
   {
     out << "(" << v.x << "," << v.y << ")";
     return out;
@@ -259,13 +371,9 @@ namespace cukd {
   template<> inline __device__ __host__
   float sqrt(float f) { return ::sqrtf(f); }
 
+  template<> inline __device__ __host__
+  double sqrt(double f) { return ::sqrt(f); }
 
-
-
-  
-
-
-  
   template <typename point_traits_a, typename point_traits_b=point_traits_a>
   inline __device__ __host__
   auto sqrDistance(const typename point_traits_a::point_t& a,
@@ -312,6 +420,7 @@ namespace cukd {
       v)` that sets the given point's d'the coordinate to the given
       value
    */
+  
   template<typename cuda_t>
   struct point_traits {
     enum { num_dims = num_dims_of<cuda_t>::value };

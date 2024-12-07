@@ -119,6 +119,71 @@ namespace cukd {
     } while(old!=assumed);
     return old;
   }
+
+
+  // 
+  inline __device__ double atomicMin(double* addr, double value) {
+      unsigned int* const addr_as_ui = reinterpret_cast<unsigned int*>(addr);
+      unsigned int old_ui[2], assumed_ui[2], value_ui[2];
+
+      // 将double值分解为两个unsigned int
+      value_ui[0] = __double_as_longlong(value) & 0xFFFFFFFF;
+      value_ui[1] = __double_as_longlong(value) >> 32;
+
+      do {
+          // 加载当前值
+          old_ui[0] = addr_as_ui[0];
+          old_ui[1] = addr_as_ui[1];
+
+          // 将两个unsigned int组合成一个double
+          double old = __longlong_as_double((old_ui[1] << 32) | old_ui[0]);
+
+          // 如果old值不大于value，则返回old
+          if (old <= value) return old;
+
+          // 假设old值大于value，尝试更新
+          assumed_ui[0] = old_ui[0];
+          assumed_ui[1] = old_ui[1];
+
+          // 执行原子比较并交换
+          old_ui[0] = atomicCAS(&addr_as_ui[0], assumed_ui[0], value_ui[0]);
+          if (old_ui[0] == assumed_ui[0]) {
+              old_ui[1] = atomicCAS(&addr_as_ui[1], assumed_ui[1], value_ui[1]);
+          }
+      } while (old_ui[1] != assumed_ui[1] || old_ui[0] != assumed_ui[0]);
+
+      // 返回旧值
+      return __longlong_as_double((old_ui[1] << 32) | old_ui[0]);
+}
+  inline __device__ double atomicMax(double* addr, double value) {
+      unsigned int* const base = reinterpret_cast<unsigned int*>(addr);
+      unsigned int old0, old1, value0, value1;
+      do {
+          // Load the current values
+          old0 = base[0];
+          old1 = base[1];
+
+          // Create a double from the loaded values
+          double old = __hiloint2double(old1, old0);
+
+          // If the old value is greater than or equal to the new value, return the old value
+          if (old >= value) {
+              return old;
+          }
+
+          // Convert the new value to two 32-bit integers
+          value0 = __double2loint(value);
+          value1 = __double2hiint(value);
+
+          // Perform the atomic compare-and-swap
+      } while (atomicCAS(&base[0], old0, value0) != old0 ||
+          atomicCAS(&base[1], old1, value1) != old1);
+
+      // Return the old value
+      return __hiloint2double(old1, old0);
+  }
+
+
 #endif
 
   template<typename data_t,
