@@ -22,10 +22,10 @@
 #include <random>
 
 using namespace cukd;
-using mydata3 = float3;
-using mydata = float;
- //using mydata3 = double3;
- //using mydata = double;
+//using mydata3 = float3;
+//using mydata = float;
+using mydata3 = double3;
+using mydata = double;
 
 template<typename T>
 T *generatePoints(int N){

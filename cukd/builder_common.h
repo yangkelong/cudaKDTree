@@ -120,68 +120,105 @@ namespace cukd {
     return old;
   }
 
-
-  // 
-  inline __device__ double atomicMin(double* addr, double value) {
-      unsigned int* const addr_as_ui = reinterpret_cast<unsigned int*>(addr);
-      unsigned int old_ui[2], assumed_ui[2], value_ui[2];
-
-      // ½«doubleÖµ·Ö½âÎªÁ½¸öunsigned int
-      value_ui[0] = __double_as_longlong(value) & 0xFFFFFFFF;
-      value_ui[1] = __double_as_longlong(value) >> 32;
-
-      do {
-          // ¼ÓÔØµ±Ç°Öµ
-          old_ui[0] = addr_as_ui[0];
-          old_ui[1] = addr_as_ui[1];
-
-          // ½«Á½¸öunsigned int×éºÏ³ÉÒ»¸ödouble
-          double old = __longlong_as_double((old_ui[1] << 32) | old_ui[0]);
-
-          // Èç¹ûoldÖµ²»´óÓÚvalue£¬Ôò·µ»Øold
-          if (old <= value) return old;
-
-          // ¼ÙÉèoldÖµ´óÓÚvalue£¬³¢ÊÔ¸üĞÂ
-          assumed_ui[0] = old_ui[0];
-          assumed_ui[1] = old_ui[1];
-
-          // Ö´ĞĞÔ­×Ó±È½Ï²¢½»»»
-          old_ui[0] = atomicCAS(&addr_as_ui[0], assumed_ui[0], value_ui[0]);
-          if (old_ui[0] == assumed_ui[0]) {
-              old_ui[1] = atomicCAS(&addr_as_ui[1], assumed_ui[1], value_ui[1]);
-          }
-      } while (old_ui[1] != assumed_ui[1] || old_ui[0] != assumed_ui[0]);
-
-      // ·µ»Ø¾ÉÖµ
-      return __longlong_as_double((old_ui[1] << 32) | old_ui[0]);
+// æ‰©å±•å‡½æ•°ä»¥æ”¯æŒ double ç±»å‹å‘é‡
+inline __device__
+double atomicMin(double *addr, double value)
+{
+  double old = *addr, assumed;
+  if(old <= value) return old;
+  do {
+    assumed = old;
+    old = __longlong_as_double(atomicCAS((unsigned long long int*)addr, __double_as_longlong(assumed), __float_as_int(value)));
+    value = min(value,old);
+  } while(old!=assumed);
+  return old;
 }
-  inline __device__ double atomicMax(double* addr, double value) {
-      unsigned int* const base = reinterpret_cast<unsigned int*>(addr);
-      unsigned int old0, old1, value0, value1;
-      do {
-          // Load the current values
-          old0 = base[0];
-          old1 = base[1];
 
-          // Create a double from the loaded values
-          double old = __hiloint2double(old1, old0);
+inline __device__
+double atomicMax(double *addr, double value)
+{
+  double old = *addr, assumed;
+  if(old >= value) return old;
+  do {
+    assumed = old;
+    old = __longlong_as_double(atomicCAS((unsigned long long int*)addr, __double_as_longlong(assumed), __double_as_longlong(value)));
+    value = max(value, old);
+  } while(old!=assumed);
+  return old;
+}
 
-          // If the old value is greater than or equal to the new value, return the old value
-          if (old >= value) {
-              return old;
-          }
 
-          // Convert the new value to two 32-bit integers
-          value0 = __double2loint(value);
-          value1 = __double2hiint(value);
+__device__ double my_atomicSub(double* address, double val) {
+ unsigned long long int* address_as_ull = (unsigned long long int*)address;
+ unsigned long long int old = *address_as_ull, assumed;
+ do {
+      assumed = old;
+      old = atomicCAS(address_as_ull, assumed, __double_as_longlong(__longlong_as_double(assumed) - val)); // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
+    } while (assumed != old);
+  return __longlong_as_double(old);
+}
 
-          // Perform the atomic compare-and-swap
-      } while (atomicCAS(&base[0], old0, value0) != old0 ||
-          atomicCAS(&base[1], old1, value1) != old1);
+// æ‰©å±•å‡½æ•°ä»¥æ”¯æŒ double ç±»å‹å‘é‡
+//   inline __device__ double atomicMin(double* addr, double value) {
+//       unsigned int* const addr_as_ui = reinterpret_cast<unsigned int*>(addr);
+//       unsigned int old_ui[2], assumed_ui[2], value_ui[2];
 
-      // Return the old value
-      return __hiloint2double(old1, old0);
-  }
+//       // å°†doubleå€¼åˆ†è§£ä¸ºä¸¤ä¸ªunsigned int
+//       value_ui[0] = __double_as_longlong(value) & 0xFFFFFFFF;
+//       value_ui[1] = __double_as_longlong(value) >> 32;
+
+//       do {
+//           // åŠ è½½å½“å‰å€¼
+//           old_ui[0] = addr_as_ui[0];
+//           old_ui[1] = addr_as_ui[1];
+
+//           // å°†ä¸¤ä¸ªunsigned intç»„åˆæˆä¸€ä¸ªdouble
+//           double old = __longlong_as_double((old_ui[1] << 32) | old_ui[0]);
+
+//           // å¦‚æœoldå€¼ä¸å¤§äºvalueï¼Œåˆ™è¿”å›old
+//           if (old <= value) return old;
+
+//           // å‡è®¾oldå€¼å¤§äºvalueï¼Œå°è¯•æ›´æ–°
+//           assumed_ui[0] = old_ui[0];
+//           assumed_ui[1] = old_ui[1];
+
+//           // æ‰§è¡ŒåŸå­æ¯”è¾ƒå¹¶äº¤æ¢
+//           old_ui[0] = atomicCAS(&addr_as_ui[0], assumed_ui[0], value_ui[0]);
+//           if (old_ui[0] == assumed_ui[0]) {
+//               old_ui[1] = atomicCAS(&addr_as_ui[1], assumed_ui[1], value_ui[1]);
+//           }
+//       } while (old_ui[1] != assumed_ui[1] || old_ui[0] != assumed_ui[0]);
+
+//       // è¿”å›æ—§å€¼
+//       return __longlong_as_double((old_ui[1] << 32) | old_ui[0]);
+// }
+//   inline __device__ double atomicMax(double* addr, double value) {
+//       unsigned int* const base = reinterpret_cast<unsigned int*>(addr);
+//       unsigned int old0, old1, value0, value1;
+//       do {
+//           // Load the current values
+//           old0 = base[0];
+//           old1 = base[1];
+
+//           // Create a double from the loaded values
+//           double old = __hiloint2double(old1, old0);
+
+//           // If the old value is greater than or equal to the new value, return the old value
+//           if (old >= value) {
+//               return old;
+//           }
+
+//           // Convert the new value to two 32-bit integers
+//           value0 = __double2loint(value);
+//           value1 = __double2hiint(value);
+
+//           // Perform the atomic compare-and-swap
+//       } while (atomicCAS(&base[0], old0, value0) != old0 ||
+//           atomicCAS(&base[1], old1, value1) != old1);
+
+//       // Return the old value
+//       return __hiloint2double(old1, old0);
+//   }
 
 
 #endif
