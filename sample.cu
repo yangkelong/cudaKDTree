@@ -15,13 +15,12 @@
 // ======================================================================== //
 
 #include "cukd/builder.h"
-// fcp = "find closest point" query
-#include "cukd/fcp.h"
+#include "cukd/fcp.h"  // fcp = "find closest point" query
 #include <queue>
 #include <iomanip>
 #include <random>
 
-using namespace cukd;
+//using namespace cukd;
 //using mydata3 = float3;
 //using mydata = float;
 using mydata3 = double3;
@@ -63,21 +62,22 @@ __global__ void d_fcp(mydata *d_results,
     return;
 
   mydata3 queryPos = d_queries[tid];
-  FcpSearchParams params;
+  cukd::FcpSearchParams params;
   params.cutOffRadius = cutOffRadius;
   int closestID = cukd::cct::fcp(queryPos, *d_bounds, d_nodes, numNodes, params);
 
   d_results[tid] = (closestID < 0)
                        ? INFINITY
-                       : distance(queryPos, d_nodes[closestID]);
+                       : cukd::distance(queryPos, d_nodes[closestID]);
 }
 
 int main(int ac, const char **av){
-  using namespace cukd::common;
+  // using namespace cukd::common;
 
   int numPoints = 1000000;
   int nRepeats = 1;
   size_t numQueries = 1000000;
+  // 搜索时的最大半径
   mydata cutOffRadius = std::numeric_limits<mydata>::infinity();
 
   for (int i = 1; i < ac; i++)
@@ -116,12 +116,12 @@ int main(int ac, const char **av){
   // of all points
   // ==================================================================
   std::cout << "calling builder..." << std::endl;
-  double t0 = getCurrentTime();
+  double t0 = cukd::common::getCurrentTime();
   cukd::buildTree(d_points, numPoints, d_bounds);
   CUKD_CUDA_SYNC_CHECK();
-  double t1 = getCurrentTime();
+  double t1 = cukd::common::getCurrentTime();
   std::cout << "done building tree, took "
-            << prettyDouble(t1 - t0) << "s" << std::endl;
+            << cukd::common::prettyDouble(t1 - t0) << "s" << std::endl;
 
   // ==================================================================
   // create set of sample query points
@@ -136,22 +136,22 @@ int main(int ac, const char **av){
   // measure perf.
   // ==================================================================
   {
-    double t0 = getCurrentTime();
+    double t0 = cukd::common::getCurrentTime();
     for (int i = 0; i < nRepeats; i++)
     {
       int bs = 128;
-      int nb = divRoundUp((int)numQueries, bs);
+      int nb = cukd::divRoundUp((int)numQueries, bs);
       d_fcp<<<nb, bs>>>(d_results, d_queries, numQueries,
                         d_bounds, d_points, numPoints, cutOffRadius);
       cudaDeviceSynchronize();
     }
     CUKD_CUDA_SYNC_CHECK();
-    double t1 = getCurrentTime();
+    double t1 = cukd::common::getCurrentTime();
     std::cout << "done " << nRepeats
               << " iterations of " << numQueries
-              << " fcp queries, took " << prettyDouble(t1 - t0)
+              << " fcp queries, took " << cukd::common::prettyDouble(t1 - t0)
               << "s" << std::endl;
-    std::cout << "that is " << prettyDouble(numQueries * nRepeats / (t1 - t0))
+    std::cout << "that is " << cukd::common::prettyDouble(numQueries * nRepeats / (t1 - t0))
               << " queries/s" << std::endl;
   }
 }

@@ -25,6 +25,7 @@ if(${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.18)
   cmake_policy(SET CMP0104 NEW)
 endif()
 
+# 是否是子项目
 if (NOT (${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR}))
   set(CUKD_IS_SUBPROJECT ON)
 else()
@@ -67,7 +68,6 @@ if (NOT CUKD_IS_SUBPROJECT)
 endif()
 
 
-
 # ------------------------------------------------------------------
 # set cuda architectures, using following rule(s):
 #
@@ -79,6 +79,7 @@ endif()
 #
 # c) otherwise let cmake detect
 # ------------------------------------------------------------------
+# 设置CUDA架构信息
 set(CUKD_CUDA_ARCHITECTURES 70)
 if (DEFINED CMAKE_CUDA_ARCHITECTURES)
   # somebnody else already defined it; leave it as is.
@@ -115,6 +116,18 @@ endif()
 # builder to store the world-space bounding box of the input points,
 # as well as to pass that pointer to the query method.
 #
+# cudaKDTree-default
+# 使用基于栈的遍历方法，不需要世界空间的边界框。
+
+# cudaKDTree-sf
+# 使用无栈遍历方法。在某些情况下，它可以生成更高效的代码，但如果输入点分布和查询点
+# 分布的组合不当，它会遇到与默认变体相同的问题。
+
+# cudaKDTree-cct
+# 使用“最近角跟踪”（closest-corner-tracking）方法，这在某些情况下可能比默认的遍历
+# 方法更快（特别是如果没有合适的截止半径，查询可能远离数据点发起，和/或对于高度聚集
+# 的数据）。然而，它确实需要分配并提供（少量的）内存，以便构建器存储输入点的世界空间
+# 边界框，并且需要将该指针传递给查询方法
 # ==================================================================
 add_library(cudaKDTree INTERFACE)
 target_sources(cudaKDTree INTERFACE
@@ -142,13 +155,19 @@ set_property(TARGET cudaKDTree PROPERTY PUBLIC CXX_STANDARD 14)
 # ================================================================== a
 # simple sample example of how to build a k-d tree
 # ==================================================================
-if (NOT CUKD_IS_SUBPROJECT)
-  add_executable(cukd_sample sample.cu)
-  target_link_libraries(cukd_sample cudaKDTree)
-endif()
+add_executable(cukd_sample sample.cu)
+target_link_libraries(cukd_sample cudaKDTree)
 
+add_executable(mycukd_sample mysample.cu mysample.h mysample_main.cpp)
+target_link_libraries(mycukd_sample cudaKDTree)
 
+add_executable(wall_distance ToWallDistance_main.cpp ToWallDistance.h ToWallDistance.cu)
+target_link_libraries(wall_distance cudaKDTree)
 
+# # 编译 壁面距离计算部分
+# 如果要将 cuda 代码编译为静态库 或者 动态库 可能要用分离编译
+# add_library(gpu_wall_dist ToWallDistance.h ToWallDistance.cu)
+# target_link_libraries(gpu_wall_dist cudaKDTree)
 
 # ==================================================================
 # create _a lot_ of test cases: this generates the whole matrix of
