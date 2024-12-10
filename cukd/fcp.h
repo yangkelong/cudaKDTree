@@ -37,18 +37,19 @@ namespace cukd {
       searched. If set to 0 the algorithm will only go down the tree
       once following the nearest branch each time. Kernels may ignore
       this value. */
+    using scalar_t = float;
     int far_node_inspect_budget = INT_MAX;
 
     /*! will only search for elements that are BELOW (i.e., NOT
       including) this radius. This in particular allows for cutting
       down on the number of branches to be visited during
       traversal */
-    float cutOffRadius = INFINITY;
+    scalar_t cutOffRadius = INFINITY;
 
     /*! Controls when to go down the far branch: only follow a far branch if
       (1+eps) * D is within the search radius, where D is the distance to the
       far node. Similar to FLANN eps parameter. */
-    float eps = 0;
+    scalar_t eps = 0;
   };
 
   namespace stackBased {
