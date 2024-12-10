@@ -152,19 +152,11 @@ set_property(TARGET cudaKDTree PROPERTY PUBLIC CXX_STANDARD 14)
 
 
 
-# ================================================================== a
+# ================================================================== 
 # simple sample example of how to build a k-d tree
 # ==================================================================
 add_executable(cukd_sample sample.cu)
 target_link_libraries(cukd_sample cudaKDTree)
-
-add_executable(wall_distance ToWallDistance_main.cpp ToWallDistance.h ToWallDistance.cu)
-target_link_libraries(wall_distance cudaKDTree)
-
-# # 编译 壁面距离计算部分
-# 如果要将 cuda 代码编译为静态库 或者 动态库 可能要用分离编译
-# add_library(gpu_wall_dist ToWallDistance.h ToWallDistance.cu)
-# target_link_libraries(gpu_wall_dist cudaKDTree)
 
 # ==================================================================
 # create _a lot_ of test cases: this generates the whole matrix of

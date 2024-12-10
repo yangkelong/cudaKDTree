@@ -28,10 +28,15 @@
 // ==================================================================
 namespace cukd {
 
-  /*! Structure of parameters to control the behavior of the FCP
+  /*! 
+    Structure of parameters to control the behavior of the FCP
     search.  By default FCP will perform an exact nearest neighbor
     search, but the following parameters can be set to cut some
-    corners and make the search approximate in favor of speed. */
+    corners and make the search approximate in favor of speed. 
+    控制 FCP 搜索行为的参数结构。默认情况下，FCP 将执行精确的最近邻搜索，
+    但可以设置以下参数以牺牲一些精度来提高速度，从而进行近似搜索：
+  */
+  template<typename scalar_t=float>
   struct FcpSearchParams {
     /*! Controls how many "far branches" of the tree will be
       searched. If set to 0 the algorithm will only go down the tree
@@ -42,21 +47,29 @@ namespace cukd {
     /*! will only search for elements that are BELOW (i.e., NOT
       including) this radius. This in particular allows for cutting
       down on the number of branches to be visited during
-      traversal */
-    float cutOffRadius = INFINITY;
+      traversal 
+    将只搜索低于(即，不包括)这个半径的元素。这尤其可以减少遍历期间访问的分支数量  
+    */
+    
+    scalar_t cutOffRadius = INFINITY;
 
     /*! Controls when to go down the far branch: only follow a far branch if
       (1+eps) * D is within the search radius, where D is the distance to the
-      far node. Similar to FLANN eps parameter. */
-    float eps = 0;
+      far node. Similar to FLANN eps parameter.
+      控制何时沿着远处的分支下行: 只有在(1 + ep) * D 在搜索半径范围内时才沿着远处的
+      分支下行，其中 D 是到远处节点的距离。类似 FLANN Eps 参数
+    */
+    scalar_t eps = 0;
   };
 
   namespace stackBased {
-    /*! default, stack-based find-closest point kernel, with simple
+    /*! 
+      default, stack-based find-closest point kernel, with simple
       point-to-plane-distance test for culling subtrees 
-      
+      默认的基于堆栈的查找最接近点内核，具有用于筛选子树的简单点到平面距离测试
       \returns the ID of the point that's closest to the query point,
       or -1 if none could be found within the given serach radius
+      返回最近邻点的索引 or -1
     */
     template<
       /*! type of data point(s) that the tree is built over (e.g., float3) */
@@ -66,7 +79,7 @@ namespace cukd {
     inline __device__
     int fcp(typename data_traits::point_t queryPoint,
             // /*! the world-space bounding box of all data points */
-            // const box_t<typename data_traits::point_t> worldBounds,
+            const box_t<typename data_traits::point_t> worldBounds,
             /*! device(!)-side array of data point, ordered in the
               right way as produced by buildTree()*/
             const data_t *dataPoints,
@@ -137,8 +150,11 @@ namespace cukd {
       'closest-corner-tracking' traversal code; this traversal uses
       a stack just like the stackBased::fcp (in fact, its stack
       footprint is even larger), but is much better at culling data
-      in particular for non-uniform input data and unbounded
-      queries */
+      in particular for non-uniform input data and unbounded queries
+      使用特殊的“最近角跟踪”遍历代码查找最近点（fcp）内核；此遍历使用与
+      stackBased：：fcp类似的堆栈（事实上，它的堆栈占用空间甚至更大），
+      但在剔除数据方面要好得多，特别是对于非均匀输入数据和无界查询
+    */
     template<typename data_t,
              typename data_traits=default_data_traits<data_t>>
     inline __device__
@@ -157,7 +173,7 @@ namespace cukd {
     template<typename data_t,
              typename data_traits=default_data_traits<data_t>>
     inline __device__
-    int fcp(const SpatialKDTree<data_t,data_traits> &tree,
+    int fcp(const SpatialKDTree<data_t, data_traits> &tree,
             typename data_traits::point_t queryPoint,
             FcpSearchParams params = FcpSearchParams{});
   } // ::cukd::cct
@@ -176,11 +192,13 @@ namespace cukd {
 namespace cukd {
 
   /*! helper struct to hold the current-best results of a fcp kernel during traversal */
+  // 辅助类: 存储遍历过程中当前最好结果
+  template<typename scalar_t>
   struct FCPResult {
-    inline __device__ float initialCullDist2() const
+    inline __device__ scalar_t initialCullDist2() const
     { return closestDist2; }
     
-    inline __device__ float clear(float initialDist2)
+    inline __device__ scalar_t clear(scalar_t initialDist2)
     {
       closestDist2 = initialDist2;
       closestPrimID = -1;
@@ -190,7 +208,7 @@ namespace cukd {
     /*! process a new candidate with given ID and (square) distance;
       and return square distance to be used for subsequent
       queries */
-    inline __device__ float processCandidate(int candPrimID, float candDist2)
+    inline __device__ scalar_t processCandidate(int candPrimID, scalar_t candDist2)
     {
       if (candDist2 < closestDist2) {
         closestDist2 = candDist2;
@@ -203,7 +221,7 @@ namespace cukd {
     { return closestPrimID; }
     
     int   closestPrimID;
-    float closestDist2;
+    scalar_t closestDist2;
   };
 
 
@@ -215,10 +233,11 @@ namespace cukd {
                const data_t *d_nodes,
                int N,
                FcpSearchParams params)
-  {
-    FCPResult result;
+  { 
+    using scalar_t  = typename scalar_type_of<data_t>::type;
+    FCPResult<scalar_t> result;
     result.clear(sqr(params.cutOffRadius));
-    traverse_cct<FCPResult,data_t,data_traits>
+    traverse_cct<FCPResult<scalar_t>,data_t,data_traits>
       (result,queryPoint,worldBounds,d_nodes,N);
     return result.returnValue();
   }
@@ -230,10 +249,11 @@ namespace cukd {
                      const data_t *d_nodes,
                      int N,
                      FcpSearchParams params)
-  {
-    FCPResult result;
+  { 
+    using scalar_t  = typename scalar_type_of<data_t>::type;
+    FCPResult<scalar_t> result;
     result.clear(sqr(params.cutOffRadius));
-    traverse_stack_free<FCPResult,data_t,data_traits>
+    traverse_stack_free<FCPResult<scalar_t>,data_t,data_traits>
       (result,queryPoint,d_nodes,N,params.eps);
     return result.returnValue();
   }
@@ -245,10 +265,11 @@ namespace cukd {
                       const data_t *d_nodes,
                       int N,
                       FcpSearchParams params)
-  {
-    FCPResult result;
+  { 
+    using scalar_t  = typename scalar_type_of<data_t>::type;
+    FCPResult<scalar_t> result;
     result.clear(sqr(params.cutOffRadius));
-    traverse_default<FCPResult,data_t,data_traits>
+    traverse_default<FCPResult<scalar_t>,data_t,data_traits>
       (result,queryPoint,d_nodes,N);
     return result.returnValue();
   }
@@ -260,8 +281,8 @@ namespace cukd {
                typename data_traits::point_t queryPoint,
                FcpSearchParams params)
   {
-    
-    FCPResult result;
+    using scalar_t  = typename scalar_type_of<data_t>::type;
+    FCPResult<scalar_t> result;
     result.clear(sqr(params.cutOffRadius));
 
     using node_t       = typename SpatialKDTree<data_t,data_traits>::Node;
@@ -285,7 +306,7 @@ namespace cukd {
     /*! current node in the tree we're traversing */
     int nodeID = 0;
     point_t closestPointOnSubtreeBounds = project(tree.bounds,queryPoint);
-    if (sqrDistance(queryPoint,closestPointOnSubtreeBounds) > cullDist)
+    if (sqrDistance(queryPoint, closestPointOnSubtreeBounds) > cullDist)
       return result.returnValue();
     node_t node;
     while (true) {
@@ -351,8 +372,9 @@ namespace cukd {
   int stackBased::fcp(const SpatialKDTree<data_t,data_traits> &tree,
                       typename data_traits::point_t queryPoint,
                       FcpSearchParams params)
-  {
-    FCPResult result;
+  { 
+    using scalar_t  = typename scalar_type_of<data_t>::type;
+    FCPResult<scalar_t> result;
     result.clear(sqr(params.cutOffRadius));
 
     using node_t     = typename SpatialKDTree<data_t,data_traits>::Node;
@@ -365,7 +387,7 @@ namespace cukd {
     /* can do at most 2**30 points... */
     struct StackEntry {
       int   nodeID;
-      float sqrDist;
+      scalar_t sqrDist;
     };
     enum{ stack_depth = 50 };
     StackEntry stackBase[stack_depth];
@@ -391,7 +413,7 @@ namespace cukd {
         const int closeChild = leftIsClose?lChild:rChild;
         const int farChild   = leftIsClose?rChild:lChild;
         
-        const float sqrDistToPlane = sqr(query_coord - node.pos);
+        const scalar_t sqrDistToPlane = sqr(query_coord - node.pos);
         if (sqrDistToPlane < cullDist) {
           stackPtr->nodeID  = farChild;
           stackPtr->sqrDist = sqrDistToPlane;
