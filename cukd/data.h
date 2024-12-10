@@ -52,6 +52,21 @@ namespace cukd {
     itself: no payload, no means of storing any split dimension (ie,
     always doing round-robin dimensions), and the coordinates just
     stored as the point itself.
+
+    为k-d树中的“数据点”定义了一个抽象接口，它是标量坐标的某种实际d维点，加上可能的
+    一些有效载荷，以及可能存储分割维度的一种方式）。这需要定义以下内容：
+
+    -data_traits:：point_t：存储此数据点坐标的实际点类型
+
+    -枚举data_traits:：hasexplicit_dim：该节点类型是否有字段在每个节点中存储显式拆
+    分维度。如果没有，k-d树构建器和travel_have_使用轮转法进行分割距离；否则，它将始终分割最宽的维度。
+
+    -枚举data_traits:：set_dim（data_t&，int）和data_trait:：get_dim（const data_t&）
+    来读取和写入维度。对于实际上没有任何显式拆分维度的data_t，这些函数可能是什么都不做的傻瓜
+    （在这种情况下，它们永远不会被调用），但必须定义它们才能让编译器满意。
+
+    此库的_default_数据点就是point_t本身：没有有效载荷，没有存储任何分割维度的方法
+    （即始终进行循环维度），坐标只是作为点本身存储。
   */
   template<typename _point_t,
            typename _point_traits=cukd::point_traits<_point_t>>
@@ -86,8 +101,8 @@ namespace cukd {
 
     /*! return the 'd'th positional coordinate of the given node */
     static inline __both__
-    scalar_t get_coord(const data_t &n, int d)
-    { return point_traits::get_coord(get_point(n),d); }
+    scalar_t get_coord(const data_t &n, int d){ 
+      return point_traits::get_coord(get_point(n), d); }
 
     // ------------------------------------------------------------------
     /* part IV : whether the data has a way of storing a split

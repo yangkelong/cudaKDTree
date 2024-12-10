@@ -20,11 +20,9 @@
 #include <iomanip>
 #include <random>
 
-//using namespace cukd;
 //using mydata3 = float3;
-//using mydata = float;
 using mydata3 = double3;
-using mydata = double;
+using mydata = typename cukd::scalar_type_of<mydata3>::type;
 
 template<typename T>
 T *generatePoints(int N){
@@ -65,7 +63,6 @@ __global__ void d_fcp(mydata *d_results,
   cukd::FcpSearchParams params;
   params.cutOffRadius = cutOffRadius;
   int closestID = cukd::cct::fcp(queryPos, *d_bounds, d_nodes, numNodes, params);
-
   d_results[tid] = (closestID < 0)
                        ? INFINITY
                        : cukd::distance(queryPos, d_nodes[closestID]);

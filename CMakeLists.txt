@@ -152,12 +152,11 @@ set_property(TARGET cudaKDTree PROPERTY PUBLIC CXX_STANDARD 14)
 
 
 
-# ================================================================== a
+# ================================================================== 
 # simple sample example of how to build a k-d tree
 # ==================================================================
 add_executable(cukd_sample sample.cu)
 target_link_libraries(cukd_sample cudaKDTree)
-
 
 # ==================================================================
 # create _a lot_ of test cases: this generates the whole matrix of
