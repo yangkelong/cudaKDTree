@@ -158,9 +158,6 @@ set_property(TARGET cudaKDTree PROPERTY PUBLIC CXX_STANDARD 14)
 add_executable(cukd_sample sample.cu)
 target_link_libraries(cukd_sample cudaKDTree)
 
-add_executable(mycukd_sample mysample.cu mysample.h mysample_main.cpp)
-target_link_libraries(mycukd_sample cudaKDTree)
-
 add_executable(wall_distance ToWallDistance_main.cpp ToWallDistance.h ToWallDistance.cu)
 target_link_libraries(wall_distance cudaKDTree)
 
