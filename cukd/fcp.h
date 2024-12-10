@@ -36,7 +36,6 @@ namespace cukd {
     控制 FCP 搜索行为的参数结构。默认情况下，FCP 将执行精确的最近邻搜索，
     但可以设置以下参数以牺牲一些精度来提高速度，从而进行近似搜索：
   */
-  template<typename scalar_t=float>
   struct FcpSearchParams {
     /*! Controls how many "far branches" of the tree will be
       searched. If set to 0 the algorithm will only go down the tree
@@ -80,7 +79,7 @@ namespace cukd {
     inline __device__
     int fcp(typename data_traits::point_t queryPoint,
             // /*! the world-space bounding box of all data points */
-            const box_t<typename data_traits::point_t> worldBounds,
+            //const box_t<typename data_traits::point_t> worldBounds,
             /*! device(!)-side array of data point, ordered in the
               right way as produced by buildTree()*/
             const data_t *dataPoints,
@@ -88,6 +87,7 @@ namespace cukd {
             int numDataPoints,
             /*! paramteres to fine-tune the search */
             FcpSearchParams params = FcpSearchParams{});
+
     template<typename data_t,
              typename data_traits=default_data_traits<data_t>>
     inline __device__

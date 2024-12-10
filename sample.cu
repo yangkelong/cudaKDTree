@@ -30,8 +30,8 @@ T *generatePoints(int N){
   std::seed_seq seq{g_seed++};
   std::default_random_engine rd(seq);
   std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
-  std::uniform_int_distribution<> dist(0, N);
-
+  //std::uniform_int_distribution<> dist(0, N);
+  std::uniform_real_distribution<> dist(-1, 1);
   std::cout << "generating " << N << " uniform random points" << std::endl;
   T *d_points = 0;
   cudaMallocManaged((char **)&d_points, N * sizeof(*d_points));
