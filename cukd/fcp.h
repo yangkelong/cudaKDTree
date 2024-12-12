@@ -42,7 +42,7 @@ namespace cukd {
       once following the nearest branch each time. Kernels may ignore
       this value. */
     using scalar_t = float;
-    int far_node_inspect_budget = INT_MAX;
+    int far_node_inspect_budget = INT_MAX;  // 好像都没有被用到？？？
 
     /*! will only search for elements that are BELOW (i.e., NOT
       including) this radius. This in particular allows for cutting
@@ -168,7 +168,7 @@ namespace cukd {
             /*! number of data points in the tree */
             int numDataPoints,
             /*! paramteres to fine-tune the search */
-            FcpSearchParams params = FcpSearchParams{});
+            FcpSearchParams params = FcpSearchParams{}, int &traverse_node_num);
     
     // the same, for a _spatial_ k-d tree 
     template<typename data_t,
@@ -233,13 +233,12 @@ namespace cukd {
                const box_t<typename data_traits::point_t> worldBounds,
                const data_t *d_nodes,
                int N,
-               FcpSearchParams params)
+               FcpSearchParams params, int &traverse_node_num)
   { 
     using scalar_t  = typename scalar_type_of<data_t>::type;
     FCPResult<scalar_t> result;
-    result.clear(sqr(params.cutOffRadius));
-    traverse_cct<FCPResult<scalar_t>,data_t,data_traits>
-      (result,queryPoint,worldBounds,d_nodes,N);
+    result.clear(sqr(params.cutOffRadius));  // 初始化 result
+    traverse_cct<FCPResult<scalar_t>, data_t, data_traits>(result,queryPoint,worldBounds,d_nodes,N, traverse_node_num);
     return result.returnValue();
   }
 

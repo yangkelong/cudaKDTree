@@ -29,7 +29,7 @@ namespace cukd {
                     typename data_traits::point_t queryPoint,
                     const box_t<typename data_traits::point_t> d_bounds,
                     const data_t *d_nodes,
-                    int numPoints){
+                    int numPoints, int &traverse_node_num){
     using point_t = typename data_traits::point_t;
     using point_traits = ::cukd::point_traits<point_t>;
     using scalar_t = typename point_traits::scalar_t;
@@ -41,48 +41,50 @@ namespace cukd {
       int nodeID;
       point_t closestCorner;
     };
+
     /* can do at most 2**30 points... */
+    // 深度优先遍历
     StackEntry  stackBase[30];
     StackEntry *stackPtr = stackBase;
 
     int nodeID = 0;
-    point_t closestPointOnSubtreeBounds = project(d_bounds,queryPoint);
+    point_t closestPointOnSubtreeBounds = project(d_bounds, queryPoint);
     if (sqrDistance(queryPoint,closestPointOnSubtreeBounds) > cullDist)
       return;
 
     while (true) {
-      if (nodeID >= numPoints) {
+      if (nodeID >= numPoints) {  // 为什么有这个if分支？？？
         while (true) {
           if (stackPtr == stackBase)
             return;
           --stackPtr;
           closestPointOnSubtreeBounds = stackPtr->closestCorner;
-          if (sqrDistance(closestPointOnSubtreeBounds,queryPoint) >= cullDist)
+          if (sqrDistance(closestPointOnSubtreeBounds, queryPoint) >= cullDist)
             continue;
           nodeID = stackPtr->nodeID;
           break;
         }
       }
-      const auto &node = d_nodes[nodeID];
-      CUKD_STATS(if (cukd::g_traversalStats) ::atomicAdd(cukd::g_traversalStats,1));
+      const auto &node = d_nodes[nodeID];  // 取出节点
+      CUKD_STATS(if (cukd::g_traversalStats) ::atomicAdd(cukd::g_traversalStats, 1));
       const point_t nodePoint = data_traits::get_point(node);
       {
-        const auto sqrDist = sqrDistance(nodePoint,queryPoint);
-        cullDist = result.processCandidate(nodeID,sqrDist);
+        const auto sqrDist = sqrDistance(nodePoint, queryPoint);  // 计算当前节点到查询点距离平方
+        cullDist = result.processCandidate(nodeID, sqrDist);  // 与当前最好记录比较
       }
       
       const int  dim
         = data_traits::has_explicit_dim
         ? data_traits::get_dim(d_nodes[nodeID])
-        : (BinaryTree::levelOf(nodeID) % num_dims);
+        : (BinaryTree::levelOf(nodeID) % num_dims);  // 如果没有 has_explicit_dim, 采用轮流轴作划分维方向
       const auto node_dim   = get_coord(nodePoint, dim);
       const auto query_dim  = get_coord(queryPoint, dim);
-      const bool  leftIsClose = query_dim < node_dim;
+      const bool  leftIsClose = query_dim < node_dim;  // 查询点位于左分支？
       const int   lChild = 2*nodeID+1;
       const int   rChild = lChild+1;
 
       auto farSideCorner = closestPointOnSubtreeBounds;
-      const int farChild = leftIsClose?rChild:lChild;
+      const int farChild = leftIsClose ? rChild : lChild;
       point_traits::set_coord(farSideCorner, dim, node_dim);
       if (farChild < numPoints && sqrDistance(farSideCorner, queryPoint) < cullDist) {
         stackPtr->closestCorner = farSideCorner;

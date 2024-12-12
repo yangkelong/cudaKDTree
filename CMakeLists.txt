@@ -43,7 +43,7 @@ set(CUKD_CUDA_ARCHITECTURES "auto" CACHE STRING "CUDA Arch(s) to build against")
 mark_as_advanced(CUKD_CUDA_ARCHITECTURES)
 
 if (NOT CUKD_IS_SUBPROJECT)
-  option(CUKD_ENABLE_STATS "Enable Stats tracking?" OFF)
+  option(CUKD_ENABLE_STATS "Enable Stats tracking?" OFF)  # 好像是记录全部查询点 访问的node数目
   if(NOT SET_UP_CONFIGURATIONS_DONE)
     set(SET_UP_CONFIGURATIONS_DONE 1)
 

@@ -54,15 +54,18 @@ __global__ void d_fcp(mydata *d_results,
                       const cukd::box_t<mydata3> *d_bounds,
                       mydata3 *d_nodes,
                       int numNodes,
-                      mydata cutOffRadius){
+                      mydata cutOffRadius, int *d_records){
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid >= numQueries)
     return;
 
-  mydata3 queryPos = d_queries[tid];
+  mydata3 queryPos = d_queries[tid];  // 查询点 坐标
   cukd::FcpSearchParams params;
   params.cutOffRadius = cutOffRadius;
-  int closestID = cukd::cct::fcp(queryPos, *d_bounds, d_nodes, numNodes, params);
+  int traverse_node_num = 0;
+  int closestID = cukd::cct::fcp(queryPos, *d_bounds, d_nodes, numNodes, params, d_records[tid]);
+  // d_records[tid] = traverse_node_num;
+
   d_results[tid] = (closestID < 0)
                        ? INFINITY
                        : cukd::distance(queryPos, d_nodes[closestID]);
@@ -127,7 +130,12 @@ int main(int ac, const char **av){
   // allocate memory for the results
   mydata *d_results;
   CUKD_CUDA_CALL(MallocManaged((void **)&d_results, numQueries * sizeof(*d_results)));
-
+  // 记录每个查询点 遍历 tree 时 访问的节点数目
+  int *d_records;
+  cudaMallocManaged((char **)&d_records, numQueries * sizeof(int));
+  for (int i = 0; i < numQueries; i++){
+    d_records[i] = 0;
+  }
   // ==================================================================
   // and do some queryies - let's do the same ones in a loop so we cna
   // measure perf.
@@ -139,7 +147,7 @@ int main(int ac, const char **av){
       int bs = 128;
       int nb = cukd::divRoundUp((int)numQueries, bs);
       d_fcp<<<nb, bs>>>(d_results, d_queries, numQueries,
-                        d_bounds, d_points, numPoints, cutOffRadius);
+                        d_bounds, d_points, numPoints, cutOffRadius, d_records);
       cudaDeviceSynchronize();
     }
     CUKD_CUDA_SYNC_CHECK();
