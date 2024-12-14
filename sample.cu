@@ -19,9 +19,10 @@
 #include <queue>
 #include <iomanip>
 #include <random>
+#include <numeric>
 
-//using mydata3 = float3;
-using mydata3 = double3;
+using mydata3 = float3;
+//using mydata3 = double3;
 using mydata = typename cukd::scalar_type_of<mydata3>::type;
 
 template<typename T>
@@ -146,8 +147,7 @@ int main(int ac, const char **av){
     {
       int bs = 128;
       int nb = cukd::divRoundUp((int)numQueries, bs);
-      d_fcp<<<nb, bs>>>(d_results, d_queries, numQueries,
-                        d_bounds, d_points, numPoints, cutOffRadius, d_records);
+      d_fcp<<<nb, bs>>>(d_results, d_queries, numQueries, d_bounds, d_points, numPoints, cutOffRadius, d_records);
       cudaDeviceSynchronize();
     }
     CUKD_CUDA_SYNC_CHECK();
@@ -158,5 +158,7 @@ int main(int ac, const char **av){
               << "s" << std::endl;
     std::cout << "that is " << cukd::common::prettyDouble(numQueries * nRepeats / (t1 - t0))
               << " queries/s" << std::endl;
+    double avg_per_query = std::accumulate(d_records, d_records+numQueries, 0.)/numQueries;
+    std::cout << "average traverse_node_num per query: " << avg_per_query << std::endl; 
   }
 }

@@ -53,7 +53,7 @@ namespace cukd {
       return;
 
     while (true) {
-      if (nodeID >= numPoints) {  // 为什么有这个if分支？？？
+      if (nodeID >= numPoints) {  // 如果 nodeID 不合理, 从栈中取出一个 nodeID
         while (true) {
           if (stackPtr == stackBase)
             return;
@@ -67,6 +67,7 @@ namespace cukd {
       }
       const auto &node = d_nodes[nodeID];  // 取出节点
       CUKD_STATS(if (cukd::g_traversalStats) ::atomicAdd(cukd::g_traversalStats, 1));
+      traverse_node_num += 1;
       const point_t nodePoint = data_traits::get_point(node);
       {
         const auto sqrDist = sqrDistance(nodePoint, queryPoint);  // 计算当前节点到查询点距离平方
