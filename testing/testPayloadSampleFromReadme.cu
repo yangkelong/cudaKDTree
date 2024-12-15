@@ -28,9 +28,7 @@ namespace example1 {
     int    payload;
   };
 
-  struct PointPlusPayload_traits
-    : public cukd::default_data_traits<float3>
-  {
+  struct PointPlusPayload_traits : public cukd::default_data_traits<float3>{
     using point_t = float3;
 
     static inline __device__ __host__
@@ -59,7 +57,7 @@ namespace example1 {
     int tid = threadIdx.x+blockIdx.x*blockIdx.x;
     if (tid >= numData) return;
 
-    int result = cukd::stackBased::fcp<PointPlusPayload,PointPlusPayload_traits>
+    int result = cukd::stackBased::fcp<PointPlusPayload, PointPlusPayload_traits>
       (data[tid].position,*d_worldBounds,data,numData);
   }
   

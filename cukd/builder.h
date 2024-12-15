@@ -59,24 +59,35 @@ namespace cukd {
     use for this coordinate data (e.g., float3), whether the data have
     a field to store an explicit split dimensional (for Bentley and
     Samet's 'optimized' trees, etc.
+    对给定的数据点构建一个左平衡的k-d树，使用data_traits来描述这个树所覆盖的数据点类型
+    （即，如何从任何潜在的有效载荷中分离出数据项的位置坐标（如果存在，例如，in a 'photon' in photon mapping），
+    使用哪种向量/点类型来表示这些坐标数据（例如，float3），
+    以及数据是否具有用于存储显式分割维度的字段（用于Bentley和Samet的“optimized” tree等）。
 
     Since a (point-)k-d tree's tree topology is implicit in the
     ordering of its data points this will re-arrange the data points
     to fulfill the balanced k-d tree criterion - ie, this WILL modify
     the data array: no individual entry will get changed, but their
-    order might. If data_traits::has_explicit_dims is defined this
+    order might. If data_traits::has_explicit_dim is defined this
     builder will choose each node's split dimension based on the
     widest dimension of that node's subtree's domain; if not, it will
     chose the dimension in a round-robin style, where the root level
     is split along the 'x' coordinate, the next level in y, etc
+    由于k-d树的树结构隐含在其数据点的排序中，这将重新排列数据点以满足平衡k-d树的标准——即，
+    这将修改数据数组：没有单个条目会被改变，但它们的顺序可能会变。如果定义了 data_traits::has_explicit_dim，
+    这个构建器将根据该节点子树域的最宽维度选择每个节点的分割维度；
+    如果没有定义，它将采用轮询方式选择维度，其中根级别沿'x'坐标分割，下一级沿'y'坐标，等等。
 
     'worldBounds' is a pointer to device-writeable memory to store the
     world-space bounding box of the data points that the builder will
-    compute. If data_traits::has_explicit_dims is true this memory
+    compute. If data_traits::has_explicit_dim is true this memory
     _has_ to be provided to the builder, and the builder will fill it
-    in; if data_traits::has_explicit_dims is false, this memory region
+    in; if data_traits::has_explicit_dim is false, this memory region
     is optional: the builder _will_ fill it in if provided, but will
     ignore it if isn't.
+    'worldBounds'是一个指向设备可写内存的指针，用于存储构建器将计算的数据点的世界空间边界框。
+    如果data_traits::has_explicit_dim为真，这个内存必须提供给构建器，并且构建器将填充它；
+    如果data_traits::has_explicit_dim为假，这个内存区域是可选的：如果提供了，构建器将填充它，如果没有提供，构建器将忽略它。
 
     *** Example 1: To build a 2D k-dtree over a CUDA int2 type (no other
     payload than the two coordinates):
@@ -90,19 +101,43 @@ namespace cukd {
     where the first 2 coordinates of each point is the dimension we
     want to build the kd-tree over, and the other 2 coordinates
     are arbitrary other payload data:
-      
+    data_t 描述了节点
+    data_traits 描述如何从 data_t 中取出坐标 && 如何划分分割平面(has_explicit_dim) && 
     struct float2_plus_payload_traits {
        using point_t = float2;
        static inline __both__ point_t get_point(const float4 &n)
        { return make_float2(n.x, n.y); }
     };
-    buildTree<float4,float2_plus_payload_traits>(...);
+
+    buildTree<float4, float2_plus_payload_traits>(...);
       
     *** Example 3: assuming you have a data type 'Photon' and a
     Photon_traits has Photon_traits::has_explicit_dim defined:
-      
+    
+    struct Photon { 
+      // the actual photon data:
+      float3  position;
+      float3  power;
+      // 3 bytes for quantized normal
+      uint8_t quantized_normal[3];
+      // 1 byte for split dimension
+      uint8_t split_dim; 
+    };
+
+    struct Photon_traits: public default_point_traits<float3> 
+    {
+      enum { has_explicit_dim = true };
+      static inline __device__ __host__
+      float3 &get_point(Photon &photon) {
+        return photon.position; }
+      static inline __device__ int  get_dim(const Photon &p){
+        return p.split_dim }
+      static inline __device__ void set_dim(Photon &p, int dim){
+        p.split_dim = dim; }
+    };
+
     cukd::box_t<float3> *d_worldBounds = <cudaMalloc>;
-    buildTree<Photon,Photon_traits>(..., worldBounds, ...);
+    buildTree<Photon, Photon_traits>(..., worldBounds, ...);
       
   */
   template<typename data_t, typename data_traits=default_data_traits<data_t>>

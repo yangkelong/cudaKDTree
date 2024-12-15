@@ -102,6 +102,14 @@ namespace cukd {
         (queryPoint,dataPoints,numDataPoints,params);
     }
 
+    template< typename data_t, typename data_traits=default_data_traits<data_t>>
+    inline __device__
+    int fcp(typename data_traits::point_t queryPoint,
+            const data_t *dataPoints,
+            int numDataPoints,
+            FcpSearchParams params, int &traverse_node_num);
+
+ 
     // the same, for a _spatial_ k-d tree 
     template<typename data_t,
              typename data_traits=default_data_traits<data_t>>
@@ -168,8 +176,17 @@ namespace cukd {
             /*! number of data points in the tree */
             int numDataPoints,
             /*! paramteres to fine-tune the search */
-            FcpSearchParams params = FcpSearchParams{}, int &traverse_node_num);
+            FcpSearchParams params, int &traverse_node_num);
     
+    template<typename data_t,
+             typename data_traits=default_data_traits<data_t>>
+    inline __device__
+    int fcp(typename data_traits::point_t queryPoint,
+            const box_t<typename data_traits::point_t> worldBounds,
+            const data_t *dataPoints,
+            int numDataPoints,
+            FcpSearchParams params = FcpSearchParams{});
+
     // the same, for a _spatial_ k-d tree 
     template<typename data_t,
              typename data_traits=default_data_traits<data_t>>
@@ -235,12 +252,30 @@ namespace cukd {
                int N,
                FcpSearchParams params, int &traverse_node_num)
   { 
-    using scalar_t  = typename scalar_type_of<data_t>::type;
+    // 注意 很多都还没改！！！！！ 只有  cct::fcp 能用 MyPoint
+    using scalar_t  = typename scalar_type_of<typename data_traits::point_t>::type;
     FCPResult<scalar_t> result;
     result.clear(sqr(params.cutOffRadius));  // 初始化 result
     traverse_cct<FCPResult<scalar_t>, data_t, data_traits>(result,queryPoint,worldBounds,d_nodes,N, traverse_node_num);
     return result.returnValue();
   }
+
+  template<typename data_t,
+           typename data_traits>
+  inline __device__
+  int cct::fcp(typename data_traits::point_t queryPoint,
+               const box_t<typename data_traits::point_t> worldBounds,
+               const data_t *d_nodes,
+               int N,
+               FcpSearchParams params)
+  { 
+    using scalar_t  = typename scalar_type_of<data_t>::type;
+    FCPResult<scalar_t> result;
+    result.clear(sqr(params.cutOffRadius));  // 初始化 result
+    traverse_cct<FCPResult<scalar_t>, data_t, data_traits>(result,queryPoint,worldBounds,d_nodes,N);
+    return result.returnValue();
+  }
+
 
   template<typename data_t,
            typename data_traits>
@@ -264,6 +299,21 @@ namespace cukd {
   int stackBased::fcp(typename data_traits::point_t queryPoint,
                       const data_t *d_nodes,
                       int N,
+                      FcpSearchParams params, int &traverse_node_num){ 
+    using scalar_t  = typename scalar_type_of<data_t>::type;
+    FCPResult<scalar_t> result;
+    result.clear(sqr(params.cutOffRadius));
+    traverse_default<FCPResult<scalar_t>, data_t, data_traits>(result, queryPoint, d_nodes, N, traverse_node_num);
+    return result.returnValue();
+  }
+
+
+  template<typename data_t,
+           typename data_traits>
+  inline __device__
+  int stackBased::fcp(typename data_traits::point_t queryPoint,
+                      const data_t *d_nodes,
+                      int N,
                       FcpSearchParams params)
   { 
     using scalar_t  = typename scalar_type_of<data_t>::type;
@@ -273,7 +323,33 @@ namespace cukd {
       (result,queryPoint,d_nodes,N);
     return result.returnValue();
   }
+  /*
 
+struct MyPoint { 
+  mydata3  position;
+  // 1 byte for split dimension
+  uint8_t split_dim; 
+};
+struct MyPoint_traits{
+  using point_t = mydata3;
+  enum { has_explicit_dim = true };
+  static inline __both__ point_t &get_point(MyPoint &mypoint) {
+    return mypoint.position; }
+  static inline __device__ int  get_dim(const MyPoint &p){
+    return p.split_dim; }
+  static inline __device__ void set_dim(MyPoint &p, int dim){
+    p.split_dim = dim; }
+  static inline __both__ float get_coord(const MyPoint &p, int d){
+    return cukd::get_coord(p.position, d); }
+};
+
+  data_t: float3, double3...
+  data_traits: default_data_traits ...
+    data_traits::point_t   eg: MyPoint::point_t
+  point_traits
+    data_traits: point_traits
+  
+  */
   template<typename data_t,
            typename data_traits>
   inline __device__

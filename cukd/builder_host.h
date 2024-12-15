@@ -18,5 +18,4 @@
 
 #include "cukd/builder_thrust.h"
 
-// buildTree_host is currently based on the thrust builder, and
-// implemented as part of builder_thrust.h
+// buildTree_host is currently based on the thrust builder, and as part of builder_thrust.h

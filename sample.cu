@@ -21,9 +21,81 @@
 #include <random>
 #include <numeric>
 
+
 using mydata3 = float3;
 //using mydata3 = double3;
 using mydata = typename cukd::scalar_type_of<mydata3>::type;
+
+
+struct MyPoint { 
+  mydata3  position;
+  // 1 byte for split dimension
+  uint8_t split_dim; 
+};
+
+struct MyPoint_traits : public cukd::default_data_traits<mydata3>{
+  using point_t = mydata3;
+
+  static inline __device__ __host__
+  mydata3 get_point(const MyPoint &data)
+  { return data.position; }
+
+  static inline __device__ __host__
+  mydata  get_coord(const MyPoint &data, int dim)
+  { return cukd::get_coord(get_point(data),dim); }
+
+  enum { has_explicit_dim = true };
+
+  static inline __device__ void set_dim(MyPoint &p, int dim){p.split_dim = dim; }
+
+  static inline __device__ int  get_dim(const MyPoint &p) { return p.split_dim; }
+};
+
+__global__ void d_fcp_mypoint(mydata *d_results, mydata3 *d_queries, int numQueries,
+                      const cukd::box_t<mydata3> *d_bounds, MyPoint *d_nodes,
+                      int numNodes, mydata cutOffRadius, int *d_records){
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if (tid >= numQueries)
+    return;
+  mydata3 queryPos = d_queries[tid];  // 查询点 坐标
+  cukd::FcpSearchParams params;
+  params.cutOffRadius = cutOffRadius;
+  int traverse_node_num = 0;
+  int closestID = cukd::cct::fcp<MyPoint, MyPoint_traits>(queryPos, *d_bounds, d_nodes, numNodes, params, d_records[tid]);
+  // d_records[tid] = traverse_node_num;
+  d_results[tid] = (closestID < 0)
+                       ? INFINITY
+                       : cukd::distance(queryPos, d_nodes[closestID].position);
+}
+
+
+
+
+MyPoint *generateMyPoints(int N){
+  static int g_seed = 100000;
+  std::seed_seq seq{g_seed++};
+  std::default_random_engine rd(seq);
+  std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
+  std::uniform_int_distribution<> int_dist(0, N);
+  std::uniform_real_distribution<> double_dist(-1, 1);
+  std::uniform_real_distribution<> double_dist_1(-10, 10);
+  std::uniform_real_distribution<> double_dist_2(-5, 5);
+  std::cout << "generating " << N << " uniform random points" << std::endl;
+  MyPoint *d_points = 0;
+  cudaMallocManaged((char **)&d_points, N * sizeof(*d_points));
+  auto &dist = int_dist;
+  if (!d_points)
+    throw std::runtime_error("could not allocate points mem...");
+
+  for (int i = 0; i < N; i++){
+    d_points[i].position.x = (mydata)(dist(gen)/10000);
+    d_points[i].position.y = (mydata)double_dist_1(gen);
+    d_points[i].position.z = 0.;
+  }
+  return d_points;
+}
+
+
 
 template<typename T>
 T *generatePoints(int N){
@@ -31,42 +103,58 @@ T *generatePoints(int N){
   std::seed_seq seq{g_seed++};
   std::default_random_engine rd(seq);
   std::mt19937 gen(rd()); // Standard mersenne_twister_engine seeded with rd()
-  //std::uniform_int_distribution<> dist(0, N);
-  std::uniform_real_distribution<> dist(-1, 1);
+  std::uniform_int_distribution<> int_dist(0, N);
+  std::uniform_real_distribution<> double_dist(-1, 1);
+  std::uniform_real_distribution<> double_dist_1(-10, 10);
+  std::uniform_real_distribution<> double_dist_2(-5, 5);
   std::cout << "generating " << N << " uniform random points" << std::endl;
   T *d_points = 0;
   cudaMallocManaged((char **)&d_points, N * sizeof(*d_points));
+  auto &dist = int_dist;
   if (!d_points)
     throw std::runtime_error("could not allocate points mem...");
 
   for (int i = 0; i < N; i++){
-    d_points[i].x = (mydata)dist(gen);
-    d_points[i].y = (mydata)dist(gen);
-    d_points[i].z = (mydata)dist(gen);
+    d_points[i].x = (mydata)(dist(gen)/10000);
+    d_points[i].y = (mydata)double_dist_1(gen);
+    d_points[i].z = 0.;
+    // d_points[i].z = (mydata)double_dist_2(gen);
   }
   return d_points;
 }
 
 
-__global__ void d_fcp(mydata *d_results,
-                      mydata3 *d_queries,
-                      int numQueries,
+__global__ void d_fcp_stackBased(mydata *d_results, mydata3 *d_queries, int numQueries,
                       /*! the world bounding box computed by the builder */
-                      const cukd::box_t<mydata3> *d_bounds,
-                      mydata3 *d_nodes,
-                      int numNodes,
-                      mydata cutOffRadius, int *d_records){
+                      const cukd::box_t<mydata3> *d_bounds, mydata3 *d_nodes,
+                      int numNodes, mydata cutOffRadius, int *d_records){
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid >= numQueries)
     return;
+  mydata3 queryPos = d_queries[tid];  // 查询点 坐标
+  cukd::FcpSearchParams params;
+  params.cutOffRadius = cutOffRadius;
+  int traverse_node_num = 0;
+  int closestID = cukd::stackBased::fcp(queryPos, d_nodes, numNodes, params, d_records[tid]);
+  // d_records[tid] = traverse_node_num;
+  d_results[tid] = (closestID < 0)
+                       ? INFINITY
+                       : cukd::distance(queryPos, d_nodes[closestID]);
+}
 
+__global__ void d_fcp(mydata *d_results, mydata3 *d_queries, int numQueries,
+                      /*! the world bounding box computed by the builder */
+                      const cukd::box_t<mydata3> *d_bounds, mydata3 *d_nodes,
+                      int numNodes, mydata cutOffRadius, int *d_records){
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if (tid >= numQueries)
+    return;
   mydata3 queryPos = d_queries[tid];  // 查询点 坐标
   cukd::FcpSearchParams params;
   params.cutOffRadius = cutOffRadius;
   int traverse_node_num = 0;
   int closestID = cukd::cct::fcp(queryPos, *d_bounds, d_nodes, numNodes, params, d_records[tid]);
   // d_records[tid] = traverse_node_num;
-
   d_results[tid] = (closestID < 0)
                        ? INFINITY
                        : cukd::distance(queryPos, d_nodes[closestID]);
@@ -134,14 +222,14 @@ int main(int ac, const char **av){
   // 记录每个查询点 遍历 tree 时 访问的节点数目
   int *d_records;
   cudaMallocManaged((char **)&d_records, numQueries * sizeof(int));
-  for (int i = 0; i < numQueries; i++){
-    d_records[i] = 0;
-  }
   // ==================================================================
   // and do some queryies - let's do the same ones in a loop so we cna
   // measure perf.
   // ==================================================================
   {
+    for (int i = 0; i < numQueries; i++){
+      d_records[i] = 0;
+    }
     double t0 = cukd::common::getCurrentTime();
     for (int i = 0; i < nRepeats; i++)
     {
@@ -161,4 +249,59 @@ int main(int ac, const char **av){
     double avg_per_query = std::accumulate(d_records, d_records+numQueries, 0.)/numQueries;
     std::cout << "average traverse_node_num per query: " << avg_per_query << std::endl; 
   }
+
+  {
+    for (int i = 0; i < numQueries; i++){
+      d_records[i] = 0;
+    }
+    double t0 = cukd::common::getCurrentTime();
+    for (int i = 0; i < nRepeats; i++)
+    {
+      int bs = 128;
+      int nb = cukd::divRoundUp((int)numQueries, bs);
+      d_fcp_stackBased<<<nb, bs>>>(d_results, d_queries, numQueries, d_bounds, d_points, numPoints, cutOffRadius, d_records);
+      cudaDeviceSynchronize();
+    }
+    CUKD_CUDA_SYNC_CHECK();
+    double t1 = cukd::common::getCurrentTime();
+    std::cout << "done " << nRepeats
+              << " iterations of " << numQueries
+              << " fcp queries, took " << cukd::common::prettyDouble(t1 - t0)
+              << "s" << std::endl;
+    std::cout << "that is " << cukd::common::prettyDouble(numQueries * nRepeats / (t1 - t0))
+              << " queries/s" << std::endl;
+    double avg_per_query = std::accumulate(d_records, d_records+numQueries, 0.)/numQueries;
+    std::cout << "average traverse_node_num per query: " << avg_per_query << std::endl; 
+  }
+
+
+  { 
+    //
+    cukd::box_t<mydata3> *d_bounds;
+    cudaMallocManaged((void **)&d_bounds, sizeof(cukd::box_t<mydata3>));
+    MyPoint *d_points = generateMyPoints(numPoints);
+    cukd::buildTree<MyPoint, MyPoint_traits>(d_points, numPoints, d_bounds);
+    for (int i = 0; i < numQueries; i++){
+      d_records[i] = 0;
+    }
+    double t0 = cukd::common::getCurrentTime();
+    for (int i = 0; i < nRepeats; i++)
+    {
+      int bs = 128;
+      int nb = cukd::divRoundUp((int)numQueries, bs);
+      d_fcp_mypoint<<<nb, bs>>>(d_results, d_queries, numQueries, d_bounds, d_points, numPoints, cutOffRadius, d_records);
+      cudaDeviceSynchronize();
+    }
+    CUKD_CUDA_SYNC_CHECK();
+    double t1 = cukd::common::getCurrentTime();
+    std::cout << "done " << nRepeats
+              << " iterations of " << numQueries
+              << " fcp queries, took " << cukd::common::prettyDouble(t1 - t0)
+              << "s" << std::endl;
+    std::cout << "that is " << cukd::common::prettyDouble(numQueries * nRepeats / (t1 - t0))
+              << " queries/s" << std::endl;
+    double avg_per_query = std::accumulate(d_records, d_records+numQueries, 0.)/numQueries;
+    std::cout << "average traverse_node_num per query: " << avg_per_query << std::endl; 
+  }
+  
 }
